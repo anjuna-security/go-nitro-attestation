@@ -2,14 +2,14 @@
 
 This repo defines the needed data structures and packages to:
 
-1. Programatically generate a Nitro Attestation Report from a Nitro Enclave
-1. Unmarshal and Validate a Nitro Attestation Report
+1. Programatically generate an AWS Nitro Attestation Report from an Anjuna Nitro Enclave
+1. Unmarshal and Validate an AWS Nitro Attestation Report
 
 This module is organized in three high-level packages:
 
 1. `attesdoc` where the data structures are defined
-1. `attester` where a function to help generate a nitro attestation report in a Go application is defined; can only be used from within a Nitro Enclave
-1. `verifier` where Go functions are defined to help with unmarshalling and validating a nitro attestation report; can be used by applications running inside or outside a Nitro Enclave
+1. `attester` where a function to help generate an AWS Nitro Attestation Report in a Go application is defined; can only be used from within an Anjuna Nitro Enclave
+1. `verifier` where Go functions are defined to help with unmarshalling and validating an AWS Nitro Attestation Report; can be used by applications running inside or outside an Anjuna Nitro Enclave
 
 ## Install
 
@@ -23,11 +23,11 @@ go get github.com/anjuna-security/go-nitro-attestation
 
 Find below a high-level overview of how to use this module.
 
-### Generate a Nitro Attestation Report
+### Generate an AWS Nitro Attestation Report
 
-If your application is running inside a Nitro Enclave, be mindful that an endpoint is available internally to the Enclave. This endpoint can be used by your application to fetch a new Signed Nitro Attestation Report. The endpoint is available at `http://localhost:50051` and the API is available in the root path.
+If your application is running inside an Anjuna Nitro Enclave, be mindful that an endpoint is available internally to the Enclave. This endpoint can be used by your application to fetch a new Signed AWS Nitro Attestation Report. The endpoint is available at `http://localhost:50051` and the API is available in the root path.
 
-If your application was written in Go, you can use the package `attester` to easily communicate with the endpoint and generate a new Signed Nitro Attestation Report.
+If your application was written in Go, you can use the package `attester` to easily communicate with the endpoint and generate a new Signed AWS Nitro Attestation Report.
 
 Go Example:
 
@@ -49,18 +49,18 @@ func main() {
         panic(err)
     }
 
-	docBytes, _ := io.ReadAll(docReader) // read the report's bytes
+    docBytes, _ := io.ReadAll(docReader) // read the report's bytes
     fmt.Printf("%x", docBytes) // print the report's bytes
 }
 ```
 
 The function `GetAttestationReport` will return an `io.ReadCloser` object, result of a `GET` request to the endpoint. The `io.ReadCloser` object can be used to read the bytes of the report with `io.ReadAll`. 
 
-If needed, you can unmarshal the report with `verifier.NewSignedAttestationReport`. The custom data you provided when calling the function will be available in the report's `Document.UserData` field and will be part of the report's final signature. The custom data cannot exceed 1024 bytes.
+If needed, you can unmarshal the report with `verifier.NewSignedAttestationReport`. The custom data you provided when calling the function will be available in the report's `Document.UserData` field and will be part of the report's final signature. The custom data cannot exceed `1024 bytes`.
 
-A common use case is for your application running inside a Nitro Enclave to generate a new report and send it to an external application for validation upon request. For that reason, the `GetAttestationReport` function returns an `io.ReadCloser` object that can be used to optimize the transfer of the report's bytes between the two applications.
+A common use case is for your application running inside an Anjuna Nitro Enclave to generate a new report and send it to an external application for validation upon request. For that reason, the `GetAttestationReport` function returns an `io.ReadCloser` object that can be used to optimize the transfer of the report's bytes between the two applications.
 
-If your application is not written in Go and you still need access to the report, you can accomplish the same with any HTTP client. The endpoint will return a stream of bytes that can later be parsed and unmarshalled into a Nitro Attestation Report.
+If your application is not written in Go and you still need access to the report, you can accomplish the same with any HTTP client. The endpoint will return a stream of bytes that can later be parsed and unmarshalled into an AWS Nitro Attestation Report.
 
 Example without Go:
 
@@ -68,14 +68,14 @@ Example without Go:
 curl http://localhost:50051 > report.bin
 ```
 
-### Validate a Nitro Attestation Report
+### Validate an AWS Nitro Attestation Report
 
-After generating a Nitro Attestation Report, you can validate it with the `verifier` package. The validation process consists of the following stages:
+After generating an AWS Nitro Attestation Report, you can validate it with the `verifier` package. The validation process consists of the following stages:
 
-1. Validate the report's signature with regards to the report's root of trust. This is to ensure the report was generated by a true Nitro Enclave.
+1. Validate the report's signature with regards to the report's root of trust. This is to ensure the report was generated by a true AWS Nitro Enclave.
 1. Validate the report's PCR values. The PCR values that you trust are provided to you when you build any enclave image file with Anjuna.
 
-To better illustrate how to validate a Nitro Attestation Report, we will assume the report's bytes you want to validate are available in a file called `report.bin` and assume that you want the report's PCR0 value to be `000000` and the report's PCR1 value to be `000001`.
+To better illustrate how to validate a AWS Nitro Attestation Report, we will assume the report's bytes you want to validate are available in a file called `report.bin` and assume that you want the report's PCR0 value to be `000000` and the report's PCR1 value to be `000001`.
 
 To validate the report with the help of the `verifier` package in your Go application, you can do something similar to the following:
 
@@ -120,28 +120,28 @@ func main() {
 Alternatively, and specially if you have a simple set of PCR values to check against, you can validate the report in one step by defining the `expectedPCRs` map to the call to `verifier.Validate` as shown below:
 
 ```go
-pakcage main
+package main
 
 import (
-	"encoding/hex"
-	...
+    "encoding/hex"
+    ...
 )
 
 func main() {
-	...
-	// Validate the report's root of trust and PCR values
-	pcr0, _ := hex.DecodeString("000000")
-	pcr1, _ := hex.DecodeString("000001")
-	expectedValues := {
-		uint64(0): pcr0,
-		uint64(1): pcr1,
-	}
+    ...
+    // Validate the report's root of trust and PCR values
+    pcr0, _ := hex.DecodeString("000000")
+    pcr1, _ := hex.DecodeString("000001")
+    expectedValues := {
+        uint64(0): pcr0,
+        uint64(1): pcr1,
+    }
 
-	if err = verifier.Validate(report, expectedValues); err != nil {
-		panic(err)
-	}
+    if err = verifier.Validate(report, expectedValues); err != nil {
+        panic(err)
+    }
 
-	fmt.Println("Report is valid!")
+    fmt.Println("Report is valid!")
 }
 ```
 
