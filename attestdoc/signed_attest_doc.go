@@ -3,7 +3,7 @@ package attestdoc
 import (
 	"bytes"
 	"crypto/sha512"
-	"io/ioutil"
+	"os"
 	"time"
 
 	"github.com/anjuna-security/go-nitro-attestation/attester/sign1"
@@ -50,7 +50,7 @@ func FromBytes(bytes []byte) (*SignedAttestDoc, error) {
 
 // FromFile reads signed attestation document from a file
 func FromFile(doc string) (*SignedAttestDoc, error) {
-	bytes, err := ioutil.ReadFile(doc)
+	bytes, err := os.ReadFile(doc)
 	if err != nil {
 		return nil, err
 	}

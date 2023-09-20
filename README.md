@@ -25,7 +25,9 @@ Find below a high-level overview of how to use this module.
 
 ### Generate an AWS Nitro Attestation Report
 
-If your application is running inside an Anjuna Nitro Enclave, be mindful that an endpoint is available internally to the Enclave. This endpoint can be used by your application to fetch a new Signed AWS Nitro Attestation Report. The endpoint is available at `http://localhost:50123` and the API is available in the root path.
+If your application is running inside an Anjuna Nitro Enclave, be mindful that an endpoint is available internally to the Enclave. This endpoint can be used by your application to fetch a new Signed AWS Nitro Attestation Report. 
+
+The endpoint is available at `http://localhost:50123` and the API is available in path `/api/v1/attestation/report`. The API accepts a `GET` request with a query parameter `userData` that can be used to provide custom data to the report. The custom data is optional and cannot exceed `1024 bytes`. The API will return the AWS Nitro Attestation Report as a CBOR-encoded COSE-signed binary document.
 
 If your application was written in Go, you can use the package `attester` to easily communicate with the endpoint and generate a new Signed AWS Nitro Attestation Report.
 
@@ -56,7 +58,7 @@ func main() {
 
 The function `GetAttestationReport` will return an `io.ReadCloser` object, result of a `GET` request to the endpoint. The `io.ReadCloser` object can be used to read the bytes of the report with `io.ReadAll`. 
 
-If needed, you can unmarshal the report with `verifier.NewSignedAttestationReport`. The custom data you provided when calling the function will be available in the report's `Document.UserData` field and will be part of the report's final signature. The custom data cannot exceed `1024 bytes`. 
+If needed, you can unmarshal the report with `verifier.NewSignedAttestationReport`. The custom data you provided when calling the function will be available in the report's `Document.UserData` field and will be part of the report's final signature.
 
 If your custom data exceeds `1024 bytes` we suggest you to send a hash of the data instead. This way you can still trust that the data was not tampered with and that it comes from a trusted source.
 
