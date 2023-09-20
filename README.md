@@ -2,7 +2,7 @@
 
 This repo defines the needed data structures and packages to:
 
-1. Programatically generate an AWS Nitro Attestation Report from an Anjuna Nitro Enclave
+1. Programmatically generate an AWS Nitro Attestation Report from an Anjuna Nitro Enclave
 1. Validate an AWS Nitro Attestation Report
 
 This module is organized in three high-level packages:
@@ -21,7 +21,7 @@ go get github.com/anjuna-security/go-nitro-attestation
 
 ## How to use
 
-Find below a high-level overview of how to use this module.
+Below you will find a high-level overview of how to use this module.
 
 ### Generate an AWS Nitro Attestation Report
 
@@ -56,13 +56,13 @@ func main() {
 }
 ```
 
-The function `GetAttestationReport` will return an `io.ReadCloser` object, result of the `GET` request to the endpoint. The `io.ReadCloser` object can be used to read the bytes of the report with `io.ReadAll`. 
+The function `GetAttestationReport` will return an `io.ReadCloser` object, the result of the `GET` request to the endpoint. The `io.ReadCloser` object can be used to read the bytes of the report with `io.ReadAll`. 
 
 If needed, you can unmarshal the report with `verifier.NewSignedAttestationReport`. The custom data you provided when calling the function will be available in the report's `Document.UserData` field and will be part of the report's final signature.
 
 If your custom data exceeds `1024 bytes` we suggest you to send a hash of the data instead. This way you can still trust that the data was not tampered with and that it comes from a trusted source.
 
-A common use case is for your application running inside an Anjuna Nitro Enclave to generate a new report and send it to an external application for validation upon request. For that reason, the `GetAttestationReport` function returns an `io.ReadCloser` object that can be used to optimize the transfer of the report's bytes between the two applications.
+A common use case is when your application, running inside an Anjuna Nitro Enclave, generates a new report and sends it to an external application for validation upon request. For that reason, the `GetAttestationReport` function returns an `io.ReadCloser` object that can be used to optimize the transfer of the report's bytes between the two applications.
 
 If your application is not written in Go and you still need access to the report, you can accomplish the same with any HTTP client. The endpoint will return a stream of bytes that can later be parsed and unmarshalled into an AWS Nitro Attestation Report.
 
