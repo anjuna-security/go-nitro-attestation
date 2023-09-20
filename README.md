@@ -38,6 +38,7 @@ package main
 
 import (
     "fmt"
+    "io"
     "github.com/anjuna-security/go-nitro-attestation/attester"
 )
 
@@ -129,13 +130,7 @@ func main() {
 Alternatively, and specially if you have a simple set of PCR values to check against, you can validate the report in one step by defining the `expectedPCRs` map to the call to `verifier.Validate` as shown below:
 
 ```go
-package main
-
-import (
-    "encoding/hex"
-    ...
-)
-
+...
 func main() {
     ...
     // Validate the report's root of trust and PCR values
