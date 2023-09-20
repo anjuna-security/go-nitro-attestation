@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	address = "http://localhost:50051"
+	address = "http://localhost:50123"
 )
 
 // GetAttestationReport requests an attestation document from an HTTP endpoint local to the enclave
