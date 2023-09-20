@@ -148,6 +148,9 @@ func main() {
     }
 
     fmt.Println("Report is valid!")
+
+    // Access the user data
+    fmt.Printf("Recovered user data: %s\n", report.Document.UserData)
 }
 ```
 
