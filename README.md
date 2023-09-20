@@ -138,11 +138,9 @@ import (
 func main() {
     ...
     // Validate the report's root of trust and PCR values
-    pcr0, _ := hex.DecodeString("000000")
-    pcr1, _ := hex.DecodeString("000001")
     expectedValues := {
-        uint64(0): pcr0,
-        uint64(1): pcr1,
+        0: "000000",
+        1: "000001",
     }
 
     if err = verifier.Validate(report, expectedValues); err != nil {

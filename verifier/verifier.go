@@ -10,7 +10,7 @@ import (
 )
 
 // / Type that represents a map of PCR values
-type PCRMap map[uint64][]byte
+type PCRMap map[uint64]string
 
 // / Creates a Signed Attestation Report from a byte stream
 func NewSignedAttestationReport(byteStream io.Reader) (*attestdoc.SignedAttestDoc, error) {
@@ -34,11 +34,17 @@ func Validate(signedDoc *attestdoc.SignedAttestDoc, expectedPCRs PCRMap) error {
 
 // / Utility function for checking whether expected match actual PCR values
 func ValidatePCRs(expectedPCRs PCRMap, actualPCRs attestdoc.PCRValues) error {
-	for index, expectedPCR := range expectedPCRs {
+	for index, expectedPCRStr := range expectedPCRs {
 		if index >= attestdoc.NumPCRValues {
 			return fmt.Errorf("Invalid PCR index %d", index)
 		}
 		actualPCR := actualPCRs[index]
+
+		expectedPCR, err := hex.DecodeString(expectedPCRStr)
+		if err != nil {
+			return fmt.Errorf("Invalid PCR value '%s' at index %d", expectedPCRStr, index)
+		}
+
 		if !bytes.Equal(expectedPCR, actualPCR) {
 			return fmt.Errorf("PCR value %d does not match: expected: %s, actual %s", index, expectedPCR, actualPCR)
 		}

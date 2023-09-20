@@ -40,6 +40,10 @@ func generateRandomPCR() []byte {
 	return pcr
 }
 
+func generateRandomPCRStr() string {
+	return hex.EncodeToString(generateRandomPCR())
+}
+
 func generateRandomPCRs() attestdoc.PCRValues {
 	pcrs := make(attestdoc.PCRValues, attestdoc.NumPCRValues)
 	for i := 0; i < len(pcrs); i++ {
@@ -69,7 +73,7 @@ func Test_NewSignedAttestationReport(t *testing.T) {
 func Test_ValidatePCRs_mismatch(t *testing.T) {
 	actualPCRs := generateRandomPCRs()
 	expectedPCRs := PCRMap{
-		1: generateRandomPCR(),
+		1: generateRandomPCRStr(),
 	}
 	err := ValidatePCRs(expectedPCRs, actualPCRs)
 	assert.ErrorContains(t, err, "does not match")
@@ -78,8 +82,8 @@ func Test_ValidatePCRs_mismatch(t *testing.T) {
 func Test_ValidatePCRs_partialMatch(t *testing.T) {
 	actualPCRs := generateRandomPCRs()
 	expectedPCRs := PCRMap{
-		0: actualPCRs[0],
-		8: generateRandomPCR(),
+		0: hex.EncodeToString(actualPCRs[0]),
+		8: generateRandomPCRStr(),
 	}
 	err := ValidatePCRs(expectedPCRs, actualPCRs)
 	assert.ErrorContains(t, err, "does not match")
@@ -88,8 +92,8 @@ func Test_ValidatePCRs_partialMatch(t *testing.T) {
 func Test_ValidatePCRs(t *testing.T) {
 	actualPCRs := generateRandomPCRs()
 	expectedPCRs := PCRMap{
-		0: actualPCRs[0],
-		8: actualPCRs[8],
+		0: hex.EncodeToString(actualPCRs[0]),
+		8: hex.EncodeToString(actualPCRs[8]),
 	}
 	err := ValidatePCRs(expectedPCRs, actualPCRs)
 	assert.NoError(t, err)
@@ -113,8 +117,8 @@ func Test_Validate_mismatch(t *testing.T) {
 	assert.NoError(t, err)
 	actualPCRs := doc.Document.PCRs
 	expectedPCRs := PCRMap{
-		0: generateRandomPCR(),
-		8: actualPCRs[8],
+		0: generateRandomPCRStr(),
+		8: hex.EncodeToString(actualPCRs[8]),
 	}
 	err = Validate(doc, expectedPCRs)
 	assert.ErrorContains(t, err, "does not match")
@@ -127,7 +131,7 @@ func Test_Validate_invalidIndex(t *testing.T) {
 	doc, err := NewSignedAttestationReport(sampleAttestDoc())
 	assert.NoError(t, err)
 	expectedPCRs := PCRMap{
-		16: generateRandomPCR(),
+		16: generateRandomPCRStr(),
 	}
 	err = Validate(doc, expectedPCRs)
 	assert.ErrorContains(t, err, "Invalid PCR index")
@@ -141,8 +145,8 @@ func Test_Validate(t *testing.T) {
 	assert.NoError(t, err)
 	actualPCRs := doc.Document.PCRs
 	expectedPCRs := PCRMap{
-		0: actualPCRs[0],
-		8: actualPCRs[8],
+		0: hex.EncodeToString(actualPCRs[0]),
+		8: hex.EncodeToString(actualPCRs[8]),
 	}
 	err = Validate(doc, expectedPCRs)
 	assert.NoError(t, err)
