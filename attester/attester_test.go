@@ -2,6 +2,7 @@ package attester
 
 import (
 	_ "embed"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,8 +17,13 @@ import (
 var testReport []byte
 
 func TestGetAttestationReport(t *testing.T) {
+	expectedData := []byte("")
 	server := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			b64UserData := r.URL.Query().Get("userData")
+			data, err := base64.URLEncoding.DecodeString(b64UserData)
+			require.NoError(t, err)
+			require.Equal(t, expectedData, data)
 			w.Write(testReport)
 		}))
 	defer server.Close()
@@ -25,6 +31,7 @@ func TestGetAttestationReport(t *testing.T) {
 	// invalid address
 	docReader, err := GetAttestationReport(nil)
 	require.Error(t, err)
+	require.Nil(t, docReader)
 
 	// valid address
 	address = server.URL
@@ -39,7 +46,9 @@ func TestGetAttestationReport(t *testing.T) {
 	require.NotEmpty(t, doc.Document.PCRs)
 	require.NotEmpty(t, doc.Document.PCRs[0])
 
-	docReader, _ = GetAttestationReport(nil)
+	// valid user data encoding
+	expectedData = []byte("test")
+	docReader, _ = GetAttestationReport(expectedData)
 	docbytes, _ := io.ReadAll(docReader)
 	fmt.Printf("%x", docbytes)
 }
