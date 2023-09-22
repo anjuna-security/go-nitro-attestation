@@ -27,7 +27,7 @@ Below you will find a high-level overview of how to use this module.
 
 If your application is running inside an Anjuna Nitro Enclave, be mindful that an endpoint is available internally to the Enclave. This endpoint can be used by your application to fetch a new Signed AWS Nitro Attestation Report. 
 
-The endpoint is available at `http://localhost:50123` and the API is available in path `/api/v1/attestation/report`. The API accepts a `GET` request with a query parameter `userData` that can be used to provide custom data to the report. The custom data is optional and cannot exceed `1024 bytes`. The API will return the AWS Nitro Attestation Report as a CBOR-encoded COSE-signed binary document.
+The endpoint is available at `http://localhost:50123` and the API is available in path `/api/v1/attestation/report`. The API accepts a `GET` request with a base64 URL encoded query parameter `userData` that can be used to provide custom data to the report. The custom data is optional and when decoded cannot exceed `1024 bytes` in size. The API will return the AWS Nitro Attestation Report as a CBOR-encoded COSE-signed binary document.
 
 If your application was written in Go, you can use the package `attester` to easily communicate with the endpoint and generate a new Signed AWS Nitro Attestation Report.
 
@@ -70,9 +70,9 @@ If your application is not written in Go and you still need access to the report
 Example without Go:
 
 ```bash
-userData=$(echo "Hello World!" | base64)
-curl http://localhost:50123/api/v1/attestation/report?userData="${userData}" > report.bin
-hd report.bin # to print the report's bytes in hex format
+userData=$(echo "Hello World!" | basenc --base64url)
+curl http://localhost:50123/api/v1/attestation/report?userData=${userData} > report.bin
+cat report.bin | basenc --base64 # to print the report's bytes in base64
 ```
 
 ### Validate an AWS Nitro Attestation Report

@@ -46,7 +46,7 @@ func ValidatePCRs(expectedPCRs PCRMap, actualPCRs attestdoc.PCRValues) error {
 		}
 
 		if !bytes.Equal(expectedPCR, actualPCR) {
-			return fmt.Errorf("PCR value %d does not match: expected: %s, actual %s", index, expectedPCR, actualPCR)
+			return fmt.Errorf("PCR value %d does not match: expected: %x, actual %x", index, expectedPCR, actualPCR)
 		}
 	}
 	return nil

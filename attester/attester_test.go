@@ -3,8 +3,6 @@ package attester
 import (
 	_ "embed"
 	"encoding/base64"
-	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -47,8 +45,16 @@ func TestGetAttestationReport(t *testing.T) {
 	require.NotEmpty(t, doc.Document.PCRs[0])
 
 	// valid user data encoding
-	expectedData = []byte("test")
-	docReader, _ = GetAttestationReport(expectedData)
-	docbytes, _ := io.ReadAll(docReader)
-	fmt.Printf("%x", docbytes)
+	expectedData, _ = base64.StdEncoding.DecodeString("SGVsbG8gV29ybGQhCg==")
+	docReader, err = GetAttestationReport(expectedData)
+	require.NoError(t, err)
+
+	report, err := verifier.NewSignedAttestationReport(docReader)
+	require.NoError(t, err)
+	require.NotNil(t, report)
+
+	pcrs := verifier.ConvertPCRsToHex(report.Document.PCRs)
+	require.NotEmpty(t, pcrs)
+
+	require.Equal(t, expectedData, report.Document.UserData)
 }
