@@ -25,9 +25,20 @@ Below you will find a high-level overview of how to use this module.
 
 ### Generate an AWS Nitro Attestation Report
 
-If your application is running inside an Anjuna Nitro Enclave, be mindful that an endpoint is available internally to the Enclave. This endpoint can be used by your application to fetch a new Signed AWS Nitro Attestation Report. 
+When running your application inside an Anjuna Nitro Enclave, there will be an internal endpoint available to the Enclave.
+This endpoint can be used by your application to fetch a new Signed AWS Nitro Attestation Report.
 
-The endpoint is available at `http://localhost:50123` and the API is available in path `/api/v1/attestation/report`. The API accepts a `GET` request with a base64 URL encoded query parameter `userData` that can be used to provide custom data to the report. The custom data is optional and when decoded cannot exceed `1024 bytes` in size. The API will return the AWS Nitro Attestation Report as a CBOR-encoded COSE-signed binary document.
+The endpoint is available at `http://localhost:50123` and the API is available at the path `/api/v1/attestation/report`.
+The API accepts a `GET` request with three optional base64 URL encoded parameters, each supporting up to 1024 bytes (after decoding):
+
+  * `userPublicKey` for supplying a public key which is included in the attestation document.
+    When using this API for the purpose of accessing secrets in KMS, an ASN.1 DER encoded RSA 2048 bit public key is expected.
+  * `userData` for providing custom data to the report.
+  * `nonce` to add a nonce value to the report for hardening the request against replay attacks.
+    The `userData` parameter can also be used for this purpose.
+    In either case a source of random data should be used for each request for it to be effective.
+
+ The API will return the AWS Nitro Attestation Report as a CBOR-encoded COSE-signed binary document.
 
 If your application was written in Go, you can use the package `attester` to easily communicate with the endpoint and generate a new Signed AWS Nitro Attestation Report.
 
@@ -37,43 +48,74 @@ Go Example:
 package main
 
 import (
+    "crypto/rand"
+    "crypto/rsa"
     "fmt"
     "io"
+
     "github.com/anjuna-security/go-nitro-attestation/attester"
 )
 
 func main() {
     // defines your custom data
     myData := []byte("Hello World!")
-    
-    // get a new report byte stream
-    docReader, err := attester.GetAttestationReport(myData) 
+
+    // generate RSA-2048 key (optional)
+    rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+    if err != nil {
+        panic(err)
+    }
+
+    // generate a 12 byte random nonce value
+    nonce := make([]byte, 12)
+    if _, err = rand.Read(nonce); err != nil {
+        panic(err)
+    }
+
+    // get a new report byte stream (pass nil to rsaKey parameter if not used)
+    docReader, err := attester.GetAttestationReport(rsaKey.PublicKey, myData, nonce)
     if err != nil {
         panic(err)
     }
 
     docBytes, _ := io.ReadAll(docReader) // read the report's bytes
-    fmt.Printf("%x", docBytes) // print the report's bytes
+    fmt.Printf("%x", docBytes)           // print the report's bytes
 }
 ```
 
 The function `GetAttestationReport` will return an `io.ReadCloser` object, the result of the `GET` request to the endpoint. The `io.ReadCloser` object can be used to read the bytes of the report with `io.ReadAll`. 
 
-If needed, you can unmarshal the report with `verifier.NewSignedAttestationReport`. The custom data you provided when calling the function will be available in the report's `Document.UserData` field and will be part of the report's final signature.
+If needed, you can unmarshal the report with `verifier.NewSignedAttestationReport`. The custom data you provided when calling the function will be available in the report's `Document.UserData` field and will be part of the report's final signature. Additionally the public key and nonce fields can be accessed via the `Document.UserPublicKey` and `Document.UserNonce` fields respectively.
 
 If your custom data exceeds `1024 bytes` we suggest you to send a hash of the data instead. This way you can still trust that the data was not tampered with and that it comes from a trusted source.
 
 A common use case is when your application, running inside an Anjuna Nitro Enclave, generates a new report and sends it to an external application for validation upon request. For that reason, the `GetAttestationReport` function returns an `io.ReadCloser` object that can be used to optimize the transfer of the report's bytes between the two applications.
+
+If any of the parameters are not needed, the value `nil` can be passed for the applicable parameter in the call to `attester.GetAttestationReport()`.
+
+For example:
+
+```go
+    docReader, err := attester.GetAttestationReport(nil, myData, nil);
+```
 
 If your application is not written in Go and you still need access to the report, you can accomplish the same with any HTTP client. The endpoint will return a stream of bytes that can later be parsed and unmarshalled into an AWS Nitro Attestation Report.
 
 Example without Go:
 
 ```bash
-userData=$(echo "Hello World!" | basenc --base64url)
-curl http://localhost:50123/api/v1/attestation/report?userData=${userData} > report.bin
+# Generate an RSA 2048 bit key pair
+openssl genrsa -out private.pem 2048
+openssl rsa -in private.pem -pubout -outform DER -out public.der
+
+userData=$(echo "Hello World!" | basenc -w0 --base64url)
+publicKey=$(basenc -w0 --base64url public.der)
+nonce=$(head -c 12 /dev/random | basenc -w0 --base64url)
+curl "http://localhost:50123/api/v1/attestation/report?userData=${userData}&userPublicKey=${publicKey}&nonce=${nonce}" > report.bin
 cat report.bin | basenc --base64 # to print the report's bytes in base64
 ```
+
+**Note**: All of the query parameters are optional and can be used individually depending on the application.
 
 ### Validate an AWS Nitro Attestation Report
 
@@ -92,11 +134,12 @@ package main
 import (
     "bufio"
     "fmt"
+    "os"
 
     "github.com/anjuna-security/go-nitro-attestation/verifier"
 )
 
-func main() {    
+func main() {
     // Unmarshal the report into a SignedAttestationReport object
     file, _ := os.Open("report.bin")
     report, err := verifier.NewSignedAttestationReport(bufio.NewReader(file))
@@ -134,7 +177,7 @@ Alternatively, and specially if you have a simple set of PCR values to check aga
 func main() {
     ...
     // Validate the report's root of trust and PCR values
-    expectedValues := {
+    expectedValues := verifier.PCRMap{
         0: "000000",
         1: "000001",
     }
@@ -150,6 +193,9 @@ func main() {
 }
 ```
 
-After validating the report, you can access the report's custom data with `report.Document.UserData` as shown above. This is the data you provided when generating the report.
+After validating the report, you can access the report's custom data with `report.Document.UserData` as shown above.
+This is the data you provided when generating the report.
 
-The map of `expectedValues` you provide to the `verifier.Validate` function will be checked against the report's PCR values. If any of the PCR values you provide does not match the report's PCR values, the validation will fail. If you do not provide any PCR values, the validation will not check the report's PCR values.
+The map of `expectedValues` you provide to the `verifier.Validate` function will be checked against the report's PCR values.
+If any of the PCR values you provide do not match the report's PCR values, the validation will fail.
+If you do not provide any PCR values, the validation will not check the report's PCR values.
