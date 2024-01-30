@@ -106,7 +106,7 @@ func TestGetAttestationReportFull(t *testing.T) {
 	expectedUserNonce := []byte{}
 	server := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			asn1PublicKey, err := base64.URLEncoding.DecodeString(r.URL.Query().Get("userPublicKey"))
+			asn1PublicKey, err := base64.URLEncoding.DecodeString(r.URL.Query().Get("publicKey"))
 			require.NoError(t, err)
 			require.Equal(t, expectedPublicKey, asn1PublicKey)
 
@@ -153,10 +153,10 @@ func TestGetAttestationReportFull(t *testing.T) {
 	pcrs := verifier.ConvertPCRsToHex(report.Document.PCRs)
 	require.NotEmpty(t, pcrs)
 
-	userPublicKeyAsn1, err := x509.MarshalPKIXPublicKey(report.Document.UserPublicKey)
+	publicKeyAsn1, err := x509.MarshalPKIXPublicKey(report.Document.UserPublicKey)
 	require.NoError(t, err)
 
-	require.Equal(t, expectedPublicKey, userPublicKeyAsn1)
+	require.Equal(t, expectedPublicKey, publicKeyAsn1)
 	require.Equal(t, sampleAttestationUserData, report.Document.UserData)
 	require.Equal(t, sampleAttestationUserNonce, report.Document.UserNonce)
 }

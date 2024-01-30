@@ -31,7 +31,7 @@ This endpoint can be used by your application to fetch a new Signed AWS Nitro At
 The endpoint is available at `http://localhost:50123` and the API is available at the path `/api/v1/attestation/report`.
 The API accepts a `GET` request with three optional base64 URL encoded parameters, each supporting up to 1024 bytes (after decoding):
 
-  * `userPublicKey` for supplying a public key which is included in the attestation document.
+  * `publicKey` for supplying a public key which is included in the attestation document.
     When using this API for the purpose of accessing secrets in KMS, an ASN.1 DER encoded RSA 2048 bit public key is expected.
   * `userData` for providing custom data to the report.
   * `nonce` to add a nonce value to the report for hardening the request against replay attacks.
@@ -111,7 +111,7 @@ openssl rsa -in private.pem -pubout -outform DER -out public.der
 userData=$(echo "Hello World!" | basenc -w0 --base64url)
 publicKey=$(basenc -w0 --base64url public.der)
 nonce=$(head -c 12 /dev/random | basenc -w0 --base64url)
-curl "http://localhost:50123/api/v1/attestation/report?userData=${userData}&userPublicKey=${publicKey}&nonce=${nonce}" > report.bin
+curl "http://localhost:50123/api/v1/attestation/report?userData=${userData}&publicKey=${publicKey}&nonce=${nonce}" > report.bin
 cat report.bin | basenc --base64 # to print the report's bytes in base64
 ```
 

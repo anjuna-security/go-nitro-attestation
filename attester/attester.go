@@ -32,7 +32,7 @@ func GetAttestationReport(publicKey any, userData []byte, nonce []byte) (io.Read
 			return nil, err
 		}
 
-		params = append(params, "userPublicKey="+base64.URLEncoding.EncodeToString(derBlob))
+		params = append(params, "publicKey="+base64.URLEncoding.EncodeToString(derBlob))
 	}
 
 	if len(nonce) > 0 {
