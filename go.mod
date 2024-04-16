@@ -3,8 +3,8 @@ module github.com/anjuna-security/go-nitro-attestation
 go 1.18
 
 require (
-	github.com/aws/aws-sdk-go v1.50.10
-	github.com/fxamacker/cbor/v2 v2.5.0
+	github.com/aws/aws-sdk-go v1.51.21
+	github.com/fxamacker/cbor/v2 v2.6.0
 	github.com/stretchr/testify v1.8.4
 )
 
