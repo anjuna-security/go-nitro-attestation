@@ -61,7 +61,7 @@ if _, err = rand.Read(nonce); err != nil {
 }
 
 // get a new report byte stream (pass nil to rsaKey parameter if not used)
-docReader, err := attester.GetAttestationReport(rsaKey.PublicKey, myData, nonce)
+docReader, err := attester.GetAttestationReport(&rsaKey.PublicKey, myData, nonce)
 if err != nil {
     panic(err)
 }
