@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 
@@ -11,7 +10,7 @@ import (
 func main() {
 	// Unmarshal the report into a SignedAttestationReport object
 	file, _ := os.Open("report.bin")
-	report, err := verifier.NewSignedAttestationReport(bufio.NewReader(file))
+	report, err := verifier.NewSignedAttestationReport(file)
 	if err != nil {
 		panic(err)
 	}

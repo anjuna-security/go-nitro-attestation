@@ -1,7 +1,6 @@
 package attestdoc
 
 import (
-	"crypto/rsa"
 	"crypto/x509"
 	"errors"
 	"fmt"
@@ -45,7 +44,7 @@ type AttestDoc struct {
 	CABundle []*x509.Certificate
 
 	// Public key attested by user (if any)
-	UserPublicKey *rsa.PublicKey
+	UserPublicKey []byte
 
 	// Additional data attested by user (if any)
 	UserData []byte
@@ -90,11 +89,6 @@ func parseAttestDoc(bytes []byte) (*AttestDoc, error) {
 		return nil, err
 	}
 
-	publicKey, err := parsePublicKey(doc.PublicKey)
-	if err != nil {
-		return nil, err
-	}
-
 	return &AttestDoc{
 		Raw:           bytes,
 		IssuerID:      doc.ModuleID,
@@ -103,7 +97,7 @@ func parseAttestDoc(bytes []byte) (*AttestDoc, error) {
 		CABundle:      certBundle,
 		PCRType:       doc.Digest,
 		PCRs:          pcrs,
-		UserPublicKey: publicKey,
+		UserPublicKey: doc.PublicKey,
 		UserData:      doc.AdditionalData,
 		UserNonce:     doc.Nonce,
 	}, nil
@@ -189,23 +183,4 @@ func parsePCRs(PCRs map[uint64][]byte) (PCRValues, error) {
 		measurements[key] = val
 	}
 	return measurements, nil
-}
-
-func parsePublicKey(bytes []byte) (*rsa.PublicKey, error) {
-	if bytes == nil {
-		// Public key is optional
-		return nil, nil
-	}
-
-	parsedKey, err := x509.ParsePKIXPublicKey(bytes)
-	if err != nil {
-		return nil, fmt.Errorf("x509.ParsePKIXPublicKey: %w", err)
-	}
-
-	publicKey, ok := parsedKey.(*rsa.PublicKey)
-	if !ok {
-		return nil, errors.New("parsedKey is not a rsa.PublicKey")
-	}
-
-	return publicKey, nil
 }

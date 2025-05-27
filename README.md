@@ -31,43 +31,48 @@ This endpoint can be used by your application to fetch a new Signed AWS Nitro At
 The endpoint is available at `http://localhost:50123` and the API is available at the path `/api/v1/attestation/report`.
 The API accepts a `GET` request with three optional base64 URL encoded parameters, each supporting up to 1024 bytes (after decoding):
 
-  * `publicKey` for supplying a public key which is included in the attestation document.
-    When using this API for the purpose of accessing secrets in KMS, an ASN.1 DER encoded RSA 2048 bit public key is expected.
-  * `userData` for providing custom data to the report.
-  * `nonce` to add a nonce value to the report for hardening the request against replay attacks.
-    The `userData` parameter can also be used for this purpose.
-    In either case a source of random data should be used for each request for it to be effective.
+* `publicKey` for supplying a public key which is included in the attestation document.
+* `userData` for providing custom data to the report.
+* `nonce` to add a nonce value to the report for hardening the request against replay attacks.
 
- The API will return the AWS Nitro Attestation Report as a CBOR-encoded COSE-signed binary document.
+The API will return the AWS Nitro Attestation Report as a CBOR-encoded COSE-signed binary document.
 
 If your application was written in Go, you can use the package `attester` to easily communicate with the endpoint and generate a new Signed AWS Nitro Attestation Report.
 
 [Go Example](./examples/attestation/main.go):
 
 ```go
-// defines your custom data
-myData := []byte("Hello World!")
-
-// generate RSA-2048 key (optional)
-rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+// Fresh ECDSA P-384 key pair; public key will appear in the report.
+privateKey, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+if err != nil {
+    panic(err)
+}
+publicKeyDer, err := x509.MarshalPKIXPublicKey(privateKey.Public())
 if err != nil {
     panic(err)
 }
 
-// generate a 12 byte random nonce value
-nonce := make([]byte, 12)
+// Application-specific payload to be signed.
+data := []byte("Hello World!")
+
+// 16-byte challenge nonce from the relying service (prevents replay).
+nonce := make([]byte, 16)
 if _, err = rand.Read(nonce); err != nil {
     panic(err)
 }
 
-// get a new report byte stream (pass nil to rsaKey parameter if not used)
-docReader, err := attester.GetAttestationReport(&rsaKey.PublicKey, myData, nonce)
+// Request attestation document (each parameter is optional).
+docReader, err := attester.GetAttestationReport(publicKeyDer, data, nonce)
 if err != nil {
     panic(err)
 }
 
-docBytes, _ := io.ReadAll(docReader) // read the report's bytes
-fmt.Printf("%x", docBytes)           // print the report's bytes
+// Remember to close the returned stream.
+defer docReader.Close()
+
+// Read and print the document (hex) for demo; normally send to verifier.
+docBytes, _ := io.ReadAll(docReader)
+fmt.Println(hex.EncodeToString(docBytes))
 ```
 
 The function `GetAttestationReport` will return an `io.ReadCloser` object, the result of the `GET` request to the endpoint. The `io.ReadCloser` object can be used to read the bytes of the report with `io.ReadAll`. 
@@ -78,25 +83,9 @@ If your custom data exceeds `1024 bytes` we suggest you to send a hash of the da
 
 A common use case is when your application, running inside an Anjuna Nitro Enclave, generates a new report and sends it to an external application for validation upon request. For that reason, the `GetAttestationReport` function returns an `io.ReadCloser` object that can be used to optimize the transfer of the report's bytes between the two applications.
 
-All parameters are optional. Section [2.2.2 of AWS's Nitro Attestation Process](https://github.com/aws/aws-nitro-enclaves-nsm-api/blob/main/docs/attestation_process.md#22-attestation-document-specification) specifies what each parameter can be used for. 
+All parameters are optional. Section [2.2.2 of AWS's Nitro Attestation Process](https://github.com/aws/aws-nitro-enclaves-nsm-api/blob/main/docs/attestation_process.md#22-attestation-document-specification) specifies what each parameter can be used for.
 
 If your application is not written in Go and you still need access to the report, you can accomplish the same with any HTTP client. The endpoint will return a stream of bytes that can later be parsed and unmarshalled into an AWS Nitro Attestation Report.
-
-Example in bash:
-
-```bash
-# Generate an RSA 2048 bit key pair
-openssl genrsa -out private.pem 2048
-openssl rsa -in private.pem -pubout -outform DER -out public.der
-
-userData=$(echo "Hello World!" | basenc -w0 --base64url)
-publicKey=$(basenc -w0 --base64url public.der)
-nonce=$(head -c 12 /dev/random | basenc -w0 --base64url)
-curl "http://localhost:50123/api/v1/attestation/report?userData=${userData}&publicKey=${publicKey}&nonce=${nonce}" > report.bin
-cat report.bin | basenc --base64 # to print the report's bytes in base64
-```
-
-**Note**: All of the query parameters are optional and can be used individually depending on your use case.
 
 ### Validate an AWS Nitro Attestation Report
 
@@ -112,7 +101,7 @@ To validate the report with the help of the `verifier` package in your Go applic
 ```go
 // Unmarshal the report into a SignedAttestationReport object
 file, _ := os.Open("report.bin")
-report, err := verifier.NewSignedAttestationReport(bufio.NewReader(file))
+report, err := verifier.NewSignedAttestationReport(file)
 if err != nil {
     panic(err)
 }

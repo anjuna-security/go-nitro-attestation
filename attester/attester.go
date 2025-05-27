@@ -1,8 +1,9 @@
 package attester
 
 import (
-	"crypto/x509"
 	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -12,27 +13,21 @@ var (
 	address = "http://localhost:50123"
 )
 
-// GetAttestationReport requests an attestation document from an HTTP endpoint local to the enclave
-// Accepts an user data byte array to be included in the attestation document
-// The user data buffer cannot be larger than attestdoc.MAX_USER_DATA_SIZE_BYTES bytes (1024 bytes)
-// publicKey can be any of the structure types accepted by x509.MarshalPKIXPublicKey(),
-// including: *rsa.PublicKey, *ecdsa.PublicKey, ed25519.PublicKey (not a pointer), and *ecdh.PublicKey
-func GetAttestationReport(publicKey any, userData []byte, nonce []byte) (io.ReadCloser, error) {
+// GetAttestationReport requests a signed attestation document from the local enclave HTTP endpoint.
+// Optional publicKey, userData, and nonce values can be included in the request.
+// Each input must not exceed [attestdoc.MAX_USER_DATA_SIZE_BYTES] (1024 bytes).
+// On success, the function returns an io.ReadCloser containing the raw report bytes.
+func GetAttestationReport(publicKey, userData, nonce []byte) (io.ReadCloser, error) {
 	url := address + "/api/v1/attestation/report"
 
 	var params []string
 
-	if len(userData) > 0 {
-		params = append(params, "userData="+base64.URLEncoding.EncodeToString(userData))
+	if len(publicKey) > 0 {
+		params = append(params, "publicKey="+base64.URLEncoding.EncodeToString(publicKey))
 	}
 
-	if publicKey != nil {
-		derBlob, err := x509.MarshalPKIXPublicKey(publicKey)
-		if err != nil {
-			return nil, err
-		}
-
-		params = append(params, "publicKey="+base64.URLEncoding.EncodeToString(derBlob))
+	if len(userData) > 0 {
+		params = append(params, "userData="+base64.URLEncoding.EncodeToString(userData))
 	}
 
 	if len(nonce) > 0 {
@@ -45,8 +40,28 @@ func GetAttestationReport(publicKey any, userData []byte, nonce []byte) (io.Read
 
 	resp, err := http.Get(url)
 	if err != nil {
-		return nil, err
+		return nil, failedToGetAttestationReport(err)
 	}
 
-	return resp.Body, nil
+	switch resp.StatusCode {
+	case http.StatusOK:
+		// Success - return the response body
+		return resp.Body, nil
+	default:
+		// Error - read the response body and return an error
+		defer resp.Body.Close()
+		var body map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+			return nil, failedToGetAttestationReport(fmt.Errorf("%s and error to parse response: %w", resp.Status, err))
+		}
+		if err, ok := body["error"]; !ok {
+			return nil, failedToGetAttestationReport(fmt.Errorf("%s and no error field in response", resp.Status))
+		} else {
+			return nil, failedToGetAttestationReport(fmt.Errorf("%s: %s", resp.Status, err))
+		}
+	}
+}
+
+func failedToGetAttestationReport(err error) error {
+	return fmt.Errorf("failed to get attestation report: %w", err)
 }

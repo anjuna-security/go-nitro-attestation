@@ -1,8 +1,6 @@
 package attester
 
 import (
-	"crypto/rsa"
-	"crypto/x509"
 	_ "embed"
 	"encoding/base64"
 	"encoding/pem"
@@ -11,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/anjuna-security/go-nitro-attestation/verifier"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -82,24 +81,6 @@ func TestGetAttestationReport(t *testing.T) {
 	require.Equal(t, expectedData, report.Document.UserData)
 }
 
-// Convert a PEM encoded public key to ASN.1 DER encoding
-func pemPubkeyToDer(t *testing.T, pemKey []byte) (rsaPubkey *rsa.PublicKey, derPubkey []byte) {
-	// Decode the PEM public key to rsa.PublicKey
-	pkcs1RSAPublicKey, _ := pem.Decode(pemKey)
-	publicKey, err := x509.ParsePKIXPublicKey(pkcs1RSAPublicKey.Bytes)
-	require.NoError(t, err)
-
-	// Cast to an rsa.PublicKey
-	rsaPubkey, ok := publicKey.(*rsa.PublicKey)
-	require.True(t, ok)
-
-	// Marshal the rsa.PublicKey to ASN.1 DER encoding
-	derPubkey, err = x509.MarshalPKIXPublicKey(rsaPubkey)
-	require.NoError(t, err)
-
-	return
-}
-
 func TestGetAttestationReportFull(t *testing.T) {
 	expectedPublicKey := []byte{}
 	expectedUserData := []byte{}
@@ -125,25 +106,27 @@ func TestGetAttestationReportFull(t *testing.T) {
 	address = server.URL
 
 	// Test with no parameters
-	docReader, err := GetAttestationReport(nil, nil, nil)
+	_, err := GetAttestationReport(nil, nil, nil)
 	require.NoError(t, err)
 
-	rsaPubkey, expectedPublicKey := pemPubkeyToDer(t, sampleAttestationDocFullPubkey)
+	der, _ := pem.Decode(sampleAttestationDocFullPubkey)
+	require.NotNil(t, der)
+	expectedPublicKey = der.Bytes
 
 	// Test with public key only
-	docReader, err = GetAttestationReport(rsaPubkey, nil, nil)
+	_, err = GetAttestationReport(expectedPublicKey, nil, nil)
 	require.NoError(t, err)
 
 	expectedUserData = []byte(sampleAttestationUserData)
 
 	// Test with public key and userData only
-	docReader, err = GetAttestationReport(rsaPubkey, expectedUserData, nil)
+	_, err = GetAttestationReport(expectedPublicKey, expectedUserData, nil)
 	require.NoError(t, err)
 
 	expectedUserNonce = []byte(sampleAttestationUserNonce)
 
 	// Full test with all parameters
-	docReader, err = GetAttestationReport(rsaPubkey, expectedUserData, expectedUserNonce)
+	docReader, err := GetAttestationReport(expectedPublicKey, expectedUserData, expectedUserNonce)
 	require.NoError(t, err)
 
 	report, err := verifier.NewSignedAttestationReport(docReader)
@@ -153,10 +136,49 @@ func TestGetAttestationReportFull(t *testing.T) {
 	pcrs := verifier.ConvertPCRsToHex(report.Document.PCRs)
 	require.NotEmpty(t, pcrs)
 
-	publicKeyAsn1, err := x509.MarshalPKIXPublicKey(report.Document.UserPublicKey)
-	require.NoError(t, err)
-
-	require.Equal(t, expectedPublicKey, publicKeyAsn1)
+	require.Equal(t, expectedPublicKey, report.Document.UserPublicKey)
 	require.Equal(t, sampleAttestationUserData, report.Document.UserData)
 	require.Equal(t, sampleAttestationUserNonce, report.Document.UserNonce)
+}
+
+func TestGetAttestationReportErrors(t *testing.T) {
+	for _, test := range []struct {
+		name           string
+		responseStatus int
+		responseBody   []byte
+		expectedError  string
+	}{{
+		name:           "WellFormedError",
+		responseStatus: http.StatusUnauthorized,
+		responseBody:   []byte(`{"error": "test error"}`),
+		expectedError:  "test error",
+	}, {
+		name:           "EmptyResponse",
+		responseStatus: http.StatusRequestTimeout,
+		responseBody:   nil,
+		expectedError:  http.StatusText(http.StatusRequestTimeout),
+	}, {
+		name:           "ResponseWithoutErrorField",
+		responseStatus: http.StatusBadRequest,
+		responseBody:   []byte(`{"message": "not an error"}`),
+		expectedError:  http.StatusText(http.StatusBadRequest),
+	}} {
+		t.Run(test.name, func(t *testing.T) {
+			server := httptest.NewServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(test.responseStatus)
+					w.Header().Set("Content-Type", "application/json")
+					_, err := w.Write(test.responseBody)
+					require.NoError(t, err)
+				}),
+			)
+			defer server.Close()
+
+			address = server.URL
+
+			docReader, err := GetAttestationReport(nil, nil, nil)
+			assert.ErrorContains(t, err, test.expectedError)
+			assert.Nil(t, docReader)
+		})
+	}
 }

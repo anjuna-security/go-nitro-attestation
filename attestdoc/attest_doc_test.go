@@ -23,8 +23,3 @@ func Test_parsePCRs_invalidIndex(t *testing.T) {
 	_, err := parsePCRs(pcrs)
 	assert.ErrorContains(t, err, "unexpected PCR index")
 }
-
-func Test_parsePublicKey_invalidKey(t *testing.T) {
-	_, err := parsePublicKey([]byte{1, 2, 3})
-	assert.ErrorContains(t, err, "x509.ParsePKIXPublicKey")
-}
